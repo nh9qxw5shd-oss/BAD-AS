@@ -7,34 +7,54 @@
   <link rel="icon" href="data:," />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    :root{--bg:#050816;--card:#0b1229;--text:#e5e7eb;--muted:#94a3b8;--line:rgba(148,163,184,.22);--bad:#ef4444}
+    :root{
+      --bg:#f3f6fb;
+      --card:#ffffff;
+      --text:#0f172a;
+      --muted:#64748b;
+      --line:rgba(15,23,42,.10);
+      --shadow:0 18px 45px rgba(15,23,42,.10);
+      --radius:18px;
+    }
     *{box-sizing:border-box}
-    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:radial-gradient(1200px 700px at 20% 10%,#0b1b4a 0%,var(--bg) 60%);color:var(--text)}
+    body{
+      margin:0;
+      font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      background:radial-gradient(1200px 700px at 20% 10%,#ffffff 0%, var(--bg) 55%);
+      color:var(--text)
+    }
     .wrap{height:100vh;display:flex;flex-direction:column}
-    header{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
-    header h1{margin:0;font-size:16px;letter-spacing:.4px}
+    header{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;background:#fff}
+    header h1{margin:0;font-size:16px;letter-spacing:.3px}
     header .tag{color:var(--muted);font-size:12px}
-    header .right{margin-left:auto;display:flex;gap:10px;align-items:center}
-    .pill{padding:6px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);font-size:12px}
-    .btn{border:1px solid var(--line);background:transparent;color:var(--text);padding:8px 10px;border-radius:12px;cursor:pointer;font-weight:800;font-size:12px}
+    header .right{margin-left:auto;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .pill{padding:6px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);font-size:12px;background:rgba(243,246,251,.85)}
+    .pill.live{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.30);color:#065f46}
+    .pill.idle{background:rgba(100,116,139,.10);border-color:rgba(100,116,139,.22);color:#475569}
+    .btn{border:1px solid var(--line);background:#fff;color:var(--text);padding:8px 10px;border-radius:12px;cursor:pointer;font-weight:800;font-size:12px}
     main{flex:1;display:grid;grid-template-columns:1.2fr .8fr;gap:12px;padding:12px;overflow:hidden}
     @media(max-width:980px){main{grid-template-columns:1fr}}
-    .card{background:rgba(11,18,41,.85);border:1px solid var(--line);border-radius:18px;padding:14px;overflow:auto}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px;overflow:auto;box-shadow:var(--shadow)}
     .idle{display:flex;align-items:center;justify-content:center;text-align:center;height:100%}
     .idle h2{margin:0 0 8px 0;font-size:22px}
     .idle p{margin:0;color:var(--muted)}
-    .banner{border-radius:16px;padding:12px;border:1px solid rgba(239,68,68,.35);background:rgba(239,68,68,.10)}
+    .banner{border-radius:16px;padding:12px;border:1px solid rgba(239,68,68,.25);background:rgba(239,68,68,.08)}
     .banner.flash{animation:flash .9s ease-in-out 0s 10}
-    @keyframes flash{0%,100%{filter:brightness(1)}50%{filter:brightness(1.65)}}
-    .big{font-size:26px;font-weight:950;letter-spacing:.4px}
+    @keyframes flash{0%,100%{filter:brightness(1)}50%{filter:brightness(1.25)}}
+    .big{font-size:26px;font-weight:950;letter-spacing:.3px}
     .sub{color:var(--muted);margin-top:6px;font-size:13px}
     table{width:100%;border-collapse:collapse;margin-top:10px}
     th,td{padding:8px;border-bottom:1px solid var(--line);text-align:left;font-size:13px;vertical-align:top}
-    th{color:var(--muted);font-size:12px}
+    th{color:var(--muted);font-size:12px;background:rgba(243,246,251,.9);position:sticky;top:0}
     .kpi{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
     .kpi .pill{color:var(--text)}
     .hidden{display:none}
     .muted{color:var(--muted)}
+    .clsPill{padding:6px 10px;border-radius:999px;border:1px solid var(--line);font-size:12px;display:inline-block}
+    .clsPill.green{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.30);color:#065f46}
+    .clsPill.amber{background:rgba(245,158,11,.14);border-color:rgba(245,158,11,.30);color:#92400e}
+    .clsPill.red{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.28);color:#991b1b}
+    .clsPill.na{background:rgba(100,116,139,.10);border-color:rgba(100,116,139,.22);color:#475569}
   </style>
 </head>
 <body>
@@ -42,7 +62,7 @@
     <header>
       <h1>BAD-AS</h1><div class="tag">Bridge Alert Screen</div>
       <div class="right">
-        <span class="pill" id="conn">Connecting…</span>
+        <span class="pill idle" id="conn">Connecting…</span>
         <button class="btn" id="arm">Arm alarm</button>
         <button class="btn" id="ack">Acknowledge</button>
       </div>
@@ -53,7 +73,7 @@
         <div class="idle" id="idle">
           <div>
             <h2>Awaiting Bridge Strike</h2>
-            <p>When BAD publishes, this screen will alert immediately.</p>
+            <p>When BAD publishes an incident, this screen will alert immediately.</p>
             <p class="muted" style="margin-top:10px">Click “Arm alarm” once per shift to allow audio.</p>
           </div>
         </div>
@@ -73,10 +93,10 @@
       </section>
 
       <aside class="card">
-        <h3 style="margin:0 0 8px 0">Lines / Class / Signals</h3>
+        <h3 style="margin:0 0 8px 0">Lines / Dispensation / Signals</h3>
         <div style="overflow:auto">
           <table>
-            <thead><tr><th>Line</th><th>Class</th><th>Signals</th><th>WS</th></tr></thead>
+            <thead><tr><th>Line</th><th>Dispensation</th><th>Signals</th></tr></thead>
             <tbody id="lines"></tbody>
           </table>
         </div>
@@ -94,7 +114,29 @@
 
   let armed=false, audioCtx=null, currentIncidentId=null, lastPublishedAt=null;
 
-  function setConn(msg){ $("conn").textContent = msg; }
+  function setConn(mode){
+    const el=$("conn");
+    if(mode==="live"){ el.textContent="Live"; el.className="pill live"; }
+    else if(mode==="idle"){ el.textContent="Idle"; el.className="pill idle"; }
+    else { el.textContent=mode||"Connecting…"; el.className="pill idle"; }
+  }
+
+  function clsClass(s){
+    const v=String(s||"").trim().toLowerCase();
+    if(!v) return "na";
+    if(v.includes("not")) return "na";
+    if(v.includes("double")) return "amber";
+    if(v.includes("amber")) return "amber";
+    if(v.includes("red")) return "red";
+    if(v.includes("green")) return "green";
+    return "na";
+  }
+
+  function clsPill(label){
+    const c=clsClass(label);
+    return `<span class="clsPill ${c}">${esc(label||"Review")}</span>`;
+  }
+
   function playAlarm(){
     if(!armed) return;
     try{
@@ -106,12 +148,12 @@
     }catch{}
   }
 
-  function showAlert({bridge, incident, lines}){
+  function showAlert({bridge, incident}){
     $("idle").style.display="none";
     $("alert").classList.remove("hidden");
 
     $("headline").textContent =
-      `${bridge.elr} ${bridge.bridge_number} · ${(bridge.location||"").trim()} · ${(bridge.bridge_name||"").trim()}`;
+      `${bridge.elr||""} ${bridge.bridge_number||""} · ${(bridge.location||"").trim()} · ${(bridge.bridge_name||"").trim()}`;
 
     const k=[];
     if(bridge.over) k.push(`Over: ${bridge.over}`);
@@ -123,9 +165,14 @@
 
     $("kpis").innerHTML = k.map(x=>`<span class="pill">${esc(x)}</span>`).join("");
     $("details").textContent = incident.details || incident.summary || "(no details provided)";
-    $("lines").innerHTML = (lines||[]).map(r =>
-      `<tr><td>${esc(r.line_name||"")}</td><td>${esc(r.line_classification||"")}</td><td>${esc(r.protecting_signals||"")}</td><td>${esc(r.workstation||"")}</td></tr>`
-    ).join("");
+
+    const arr = Array.isArray(bridge.raw_records) ? bridge.raw_records : [];
+    $("lines").innerHTML = (arr||[]).map(r=>{
+      const ln=r?.["Line"]||"";
+      const cls=r?.["Line Classification"]||"Review";
+      const sig=r?.["Protecting Signals (combined)"]||"";
+      return `<tr><td>${esc(ln)}</td><td>${clsPill(cls)}</td><td class="muted">${esc(sig)}</td></tr>`;
+    }).join("");
 
     $("banner").classList.add("flash");
     setTimeout(()=>$("banner").classList.remove("flash"),9000);
@@ -142,25 +189,21 @@
       .limit(1);
 
     if(error){ setConn("Error"); return; }
-    if(!inc || inc.length===0){ setConn("Idle"); return; }
+    if(!inc || inc.length===0){ setConn("idle"); return; }
 
     const incident = inc[0];
-    setConn("Live");
+    setConn("live");
 
     if(currentIncidentId===incident.id && lastPublishedAt===incident.published_at) return;
     currentIncidentId=incident.id; lastPublishedAt=incident.published_at;
 
-    const { data: bridge } = await sb
+    const { data: bridge, error: eB } = await sb
       .from("bad_bridges")
-      .select("id, elr, bridge_number, bridge_name, location, mileage, over, highway_authority")
+      .select("id, elr, bridge_number, bridge_name, location, mileage, over, highway_authority, raw_records")
       .eq("id", incident.bridge_id).single();
 
-    const { data: lines } = await sb
-      .from("bad_bridge_lines")
-      .select("line_name, line_classification, protecting_signals, workstation")
-      .eq("bridge_id", incident.bridge_id);
-
-    showAlert({bridge, incident, lines});
+    if(eB) return;
+    showAlert({bridge, incident});
   }
 
   async function start(){
@@ -170,7 +213,7 @@
     try{
       sb.channel("bad-as-incidents")
         .on("postgres_changes",{event:"*",schema:"public",table:"bad_incidents"},()=>fetchLatestPublished())
-        .subscribe((s)=>{ if(s==="SUBSCRIBED") setConn("Live"); });
+        .subscribe((s)=>{ if(s==="SUBSCRIBED") setConn("live"); });
     }catch{}
   }
 
