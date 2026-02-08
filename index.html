@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BAD-AS — Alert Screen</title>
+  <link rel="icon" href="data:," />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root{--bg:#050816;--card:#0b1229;--text:#e5e7eb;--muted:#94a3b8;--line:rgba(148,163,184,.22);--bad:#ef4444}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:radial-gradient(1200px 700px at 20% 10%,#0b1b4a 0%,var(--bg) 60%);color:var(--text)}
+    .wrap{height:100vh;display:flex;flex-direction:column}
+    header{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+    header h1{margin:0;font-size:16px;letter-spacing:.4px}
+    header .tag{color:var(--muted);font-size:12px}
+    header .right{margin-left:auto;display:flex;gap:10px;align-items:center}
+    .pill{padding:6px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);font-size:12px}
+    .btn{border:1px solid var(--line);background:transparent;color:var(--text);padding:8px 10px;border-radius:12px;cursor:pointer;font-weight:800;font-size:12px}
+    main{flex:1;display:grid;grid-template-columns:1.2fr .8fr;gap:12px;padding:12px;overflow:hidden}
+    @media(max-width:980px){main{grid-template-columns:1fr}}
+    .card{background:rgba(11,18,41,.85);border:1px solid var(--line);border-radius:18px;padding:14px;overflow:auto}
+    .idle{display:flex;align-items:center;justify-content:center;text-align:center;height:100%}
+    .idle h2{margin:0 0 8px 0;font-size:22px}
+    .idle p{margin:0;color:var(--muted)}
+    .banner{border-radius:16px;padding:12px;border:1px solid rgba(239,68,68,.35);background:rgba(239,68,68,.10)}
+    .banner.flash{animation:flash .9s ease-in-out 0s 10}
+    @keyframes flash{0%,100%{filter:brightness(1)}50%{filter:brightness(1.65)}}
+    .big{font-size:26px;font-weight:950;letter-spacing:.4px}
+    .sub{color:var(--muted);margin-top:6px;font-size:13px}
+    table{width:100%;border-collapse:collapse;margin-top:10px}
+    th,td{padding:8px;border-bottom:1px solid var(--line);text-align:left;font-size:13px;vertical-align:top}
+    th{color:var(--muted);font-size:12px}
+    .kpi{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+    .kpi .pill{color:var(--text)}
+    .hidden{display:none}
+    .muted{color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>BAD-AS</h1><div class="tag">Bridge Alert Screen</div>
+      <div class="right">
+        <span class="pill" id="conn">Connecting…</span>
+        <button class="btn" id="arm">Arm alarm</button>
+        <button class="btn" id="ack">Acknowledge</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="card">
+        <div class="idle" id="idle">
+          <div>
+            <h2>Awaiting Bridge Strike</h2>
+            <p>When BAD publishes, this screen will alert immediately.</p>
+            <p class="muted" style="margin-top:10px">Click “Arm alarm” once per shift to allow audio.</p>
+          </div>
+        </div>
+
+        <div id="alert" class="hidden">
+          <div class="banner" id="banner">
+            <div class="big">BRIDGE STRUCK</div>
+            <div class="sub" id="headline"></div>
+            <div class="kpi" id="kpis"></div>
+          </div>
+
+          <div class="card" style="margin-top:12px">
+            <h3 style="margin:0 0 8px 0">Details</h3>
+            <div id="details" class="muted"></div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="card">
+        <h3 style="margin:0 0 8px 0">Lines / Class / Signals</h3>
+        <div style="overflow:auto">
+          <table>
+            <thead><tr><th>Line</th><th>Class</th><th>Signals</th><th>WS</th></tr></thead>
+            <tbody id="lines"></tbody>
+          </table>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+<script>
+  const SUPABASE_URL = "https://ungtmfwxqawkdiflmora.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVuZ3RtZnd4cWF3a2RpZmxtb3JhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIxMDY4NjQsImV4cCI6MjA3NzY4Mjg2NH0.Yaq0XfbbkwxJDUoiPCS7bLVBy70Wa-NOOWIxkpRRxdc";
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => (s||"").replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+
+  let armed=false, audioCtx=null, currentIncidentId=null, lastPublishedAt=null;
+
+  function setConn(msg){ $("conn").textContent = msg; }
+  function playAlarm(){
+    if(!armed) return;
+    try{
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+      o.type="sine"; o.frequency.value=880; g.gain.value=.12;
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(); setTimeout(()=>o.frequency.value=660,220); setTimeout(()=>o.stop(),520);
+    }catch{}
+  }
+
+  function showAlert({bridge, incident, lines}){
+    $("idle").style.display="none";
+    $("alert").classList.remove("hidden");
+
+    $("headline").textContent =
+      `${bridge.elr} ${bridge.bridge_number} · ${(bridge.location||"").trim()} · ${(bridge.bridge_name||"").trim()}`;
+
+    const k=[];
+    if(bridge.over) k.push(`Over: ${bridge.over}`);
+    if(bridge.mileage) k.push(`Mileage: ${bridge.mileage}`);
+    if(bridge.highway_authority) k.push(`Authority: ${bridge.highway_authority}`);
+    if(incident.fms_ref) k.push(`FMS: ${incident.fms_ref}`);
+    if(incident.ccil_ref) k.push(`CCIL: ${incident.ccil_ref}`);
+    k.push(`Status: ${incident.status}`);
+
+    $("kpis").innerHTML = k.map(x=>`<span class="pill">${esc(x)}</span>`).join("");
+    $("details").textContent = incident.details || incident.summary || "(no details provided)";
+    $("lines").innerHTML = (lines||[]).map(r =>
+      `<tr><td>${esc(r.line_name||"")}</td><td>${esc(r.line_classification||"")}</td><td>${esc(r.protecting_signals||"")}</td><td>${esc(r.workstation||"")}</td></tr>`
+    ).join("");
+
+    $("banner").classList.add("flash");
+    setTimeout(()=>$("banner").classList.remove("flash"),9000);
+    playAlarm();
+  }
+
+  async function fetchLatestPublished(){
+    const { data: inc, error } = await sb
+      .from("bad_incidents")
+      .select("id, bridge_id, status, summary, details, fms_ref, ccil_ref, published_at")
+      .not("published_at","is",null)
+      .eq("status","open")
+      .order("published_at",{ascending:false})
+      .limit(1);
+
+    if(error){ setConn("Error"); return; }
+    if(!inc || inc.length===0){ setConn("Idle"); return; }
+
+    const incident = inc[0];
+    setConn("Live");
+
+    if(currentIncidentId===incident.id && lastPublishedAt===incident.published_at) return;
+    currentIncidentId=incident.id; lastPublishedAt=incident.published_at;
+
+    const { data: bridge } = await sb
+      .from("bad_bridges")
+      .select("id, elr, bridge_number, bridge_name, location, mileage, over, highway_authority")
+      .eq("id", incident.bridge_id).single();
+
+    const { data: lines } = await sb
+      .from("bad_bridge_lines")
+      .select("line_name, line_classification, protecting_signals, workstation")
+      .eq("bridge_id", incident.bridge_id);
+
+    showAlert({bridge, incident, lines});
+  }
+
+  async function start(){
+    await fetchLatestPublished();
+    setInterval(fetchLatestPublished, 4000);
+
+    try{
+      sb.channel("bad-as-incidents")
+        .on("postgres_changes",{event:"*",schema:"public",table:"bad_incidents"},()=>fetchLatestPublished())
+        .subscribe((s)=>{ if(s==="SUBSCRIBED") setConn("Live"); });
+    }catch{}
+  }
+
+  $("arm").addEventListener("click", async ()=>{
+    armed=true;
+    try{ audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); await audioCtx.resume(); }catch{}
+    $("arm").textContent="Alarm armed";
+    playAlarm();
+  });
+
+  $("ack").addEventListener("click", ()=>$("banner").classList.remove("flash"));
+
+  start();
+</script>
+</body>
+</html>
